@@ -1,0 +1,224 @@
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    html {
+      background-color: #eee;
+      font-family: sans-serif;
+    }
+
+    body {
+      margin: 0;
+      font-size: 12pt;
+    }
+
+    header {
+      padding: 1em 2em;
+      background-color: #fff;
+      box-shadow: #aaa 0 0 1em;
+      user-select: none;
+    }
+    
+    header > div {
+      margin: 10px 0;
+    }
+
+    main {
+      padding: 2em;
+      background-color: #fff;
+      width: 90%;
+      margin: 2em auto;
+      box-shadow: #aaa 0 0 1em;
+    }
+
+    #error {
+      color: red;
+      font-weight: bold;
+    }
+
+    small {
+      font-size: 8pt;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div>
+      <label for="organization">Organization:</label>
+      <input type="text" name="organization" required>
+      <label for="username">Username:</label>
+      <input type="text" name="username" required>
+      <label for="token">Token:</label>
+      <input type="text" name="token" required size="45">
+    </div>
+    <div>
+      <label for="from">From:</label>
+      <input type="date" name="from" required>
+      <label for="to">To:</label>
+      <input type="date" name="to" required>
+      <input type="button" value="Execute" onclick="executeClick(this)">
+    </div>
+  </header>
+
+  <main style="display:none">
+    <div id="content"></div>
+    <div id="error"></div>
+  </main>
+
+  <script>
+
+    const store = window.localStorage;
+
+    if (!store.from || !store.to) {
+      store.from = new Date(new Date().setMonth(new Date().getMonth() - 1));
+      store.to = new Date();
+    }
+    for (const name of ['organization', 'username', 'token']) {
+      const input = document.getElementsByName(name)[0];
+      input.value = store.getItem(name);
+      input.oninput = () => store.setItem(name, input.value);
+    }
+    for (const name of ['from', 'to']) {
+      const dateInput = document.getElementsByName(name)[0];
+      dateInput.valueAsDate = new Date(store.getItem(name));
+      dateInput.oninput = () => store.setItem(name, dateInput.valueAsDate);
+    }
+
+
+    const elemMain = document.getElementsByTagName('main')[0];
+    const elemError = document.getElementById('error');
+    const elemContent = document.getElementById('content');
+
+
+    function get(path, params) {
+      const baseUrl = `https://dev.azure.com/${store.organization}/`;
+      const url = new URL(path, baseUrl);
+      url.search = new URLSearchParams(params).toString();
+      return fetch(
+        url,
+        {
+          method: 'get',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + window.btoa(store.username + ':' + store.token)
+          }
+        })
+        .then(response => {
+          if (response.status >= 200 && response.status < 300) {
+            return Promise.resolve(response)
+          } else {
+            return Promise.reject(new Error(response.statusText))
+          }
+        })
+        .then(response => response.json());
+    }
+
+    function el(tag, ...content) {
+      const e = document.createElement(tag);
+      for (const c of content.flatMap(c => c)) {
+        e.innerHTML += c instanceof HTMLElement ? c.outerHTML : c;
+      }
+      return e;
+    }
+
+    function debug(title, data) {
+      document.body.append(
+        el('h1', title),
+        el('pre', JSON.stringify(data, null, 2))
+      );
+    }
+
+
+    async function executeClick(inputButton) {
+      elemError.innerHTML = '';
+      elemContent.innerHTML = '';
+      inputButton.disabled = true;
+      elemMain.style.display = 'none';
+      await load().catch((err) => { elemError.innerText = err; });
+      elemMain.style.display = '';
+      inputButton.disabled = false;
+    }
+
+    async function load() {
+      const connectionData = await get('_apis/connectionData');
+      const userId = connectionData.authenticatedUser.id;
+
+      const repositories = await get(`cybervadis/_apis/git/repositories`, { includeLinks: false, includeHidden: true });
+
+      const repositoriesWithCommits = await Promise.all(
+        repositories.value.map(
+          repository => get(`cybervadis/_apis/git/repositories/${repository.id}/commits`, { 'searchCriteria.author': store.username })
+            .then(commits => {
+              return { repository, commits }
+            })
+        )
+      )
+
+      const pullRequests = await Promise.all([
+        get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.creatorId': userId, 'searchCriteria.status': 'completed' }),
+        get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.reviewerId': userId })
+      ]);
+
+      const pullRequestsGrouped = pullRequests
+        .map(r => r.value)
+        .reduce((a, b) => a.concat(b))
+        .sort((a, b) => new Date(a.creationDate) - new Date(b.creationDate))
+        .reduce((r, v, i, a, k = v.repository.name) => ((r[k] || (r[k] = [])).push(v), r), {});
+
+
+      elemContent.append(
+        el('h2', 'Commits'),
+        el('span',
+          repositoriesWithCommits
+            .filter(item => item.commits.count > 0)
+            .flatMap(
+              item =>
+                [
+                  el('h4', item.repository.name),
+                  el('ul',
+                    item.commits.value.map(commit =>
+                      el('li',
+                        el('div',
+                          el('small', `(${commit.commitId})`),
+                          ` ${commit.comment}`
+                        )
+                      )
+                    )
+                  )
+                ]
+            )
+        )
+      );
+
+
+      elemContent.append(el('h2', 'Pull Requests'));
+      for (const repositoryName in pullRequestsGrouped) {
+        const pullRequests = pullRequestsGrouped[repositoryName];
+        elemContent.append(
+          el('h3', repositoryName),
+          el('ul',
+            pullRequests.map(pr =>
+              el('li',
+                el('div',
+                  `(${pr.pullRequestId}) ${pr.title}`,
+                  el('br'),
+                  el('small', `${pr.url}`)
+                ),
+              )
+            )
+          )
+        );
+      }
+
+    }
+
+  </script>
+
+</body>
+
+</html>
