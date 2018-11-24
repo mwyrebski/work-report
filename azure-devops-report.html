@@ -148,73 +148,81 @@
       const connectionData = await get('_apis/connectionData');
       const userId = connectionData.authenticatedUser.id;
 
-      const repositories = await get(`cybervadis/_apis/git/repositories`, { includeLinks: false, includeHidden: true });
-
-      const repositoriesWithCommits = await Promise.all(
-        repositories.value.map(
-          repository => get(`cybervadis/_apis/git/repositories/${repository.id}/commits`, { 'searchCriteria.author': store.username })
-            .then(commits => {
-              return { repository, commits }
-            })
-        )
-      )
-
-      const pullRequests = await Promise.all([
-        get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.creatorId': userId, 'searchCriteria.status': 'completed' }),
-        get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.reviewerId': userId })
-      ]);
-
-      const pullRequestsGrouped = pullRequests
-        .map(r => r.value)
-        .reduce((a, b) => a.concat(b))
-        .sort((a, b) => new Date(a.creationDate) - new Date(b.creationDate))
-        .reduce((r, v, i, a, k = v.repository.name) => ((r[k] || (r[k] = [])).push(v), r), {});
-
-
-      elemContent.append(
-        el('h2', 'Commits'),
-        el('span',
-          repositoriesWithCommits
-            .filter(item => item.commits.count > 0)
-            .flatMap(
-              item =>
-                [
-                  el('h4', item.repository.name),
-                  el('ul',
-                    item.commits.value.map(commit =>
-                      el('li',
-                        el('div',
-                          el('small', `(${commit.commitId})`),
-                          ` ${commit.comment}`
-                        )
-                      )
-                    )
-                  )
-                ]
-            )
-        )
-      );
-
-
-      elemContent.append(el('h2', 'Pull Requests'));
-      for (const repositoryName in pullRequestsGrouped) {
-        const pullRequests = pullRequestsGrouped[repositoryName];
-        elemContent.append(
-          el('h3', repositoryName),
-          el('ul',
-            pullRequests.map(pr =>
-              el('li',
-                el('div',
-                  `(${pr.pullRequestId}) ${pr.title}`,
-                  el('br'),
-                  el('small', `${pr.url}`)
-                ),
-              )
-            )
+      async function getRepositoriesWithCommits() {
+        const repositories = await get(`cybervadis/_apis/git/repositories`, { includeLinks: false, includeHidden: true });
+        const repositoriesWithCommits = await Promise.all(
+          repositories.value.map(
+            repository => get(`cybervadis/_apis/git/repositories/${repository.id}/commits`, { 'searchCriteria.author': store.username })
+              .then(commits => {
+                return { repository, commits }
+              })
           )
-        );
+        )
+        return repositoriesWithCommits;
       }
 
+      async function getPullRequestsGrouped() {
+        const pullRequests = await Promise.all([
+          get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.creatorId': userId, 'searchCriteria.status': 'completed' }),
+          get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.reviewerId': userId })
+        ]);
+        const pullRequestsGrouped = pullRequests
+          .map(r => r.value)
+          .reduce((a, b) => a.concat(b))
+          .sort((a, b) => new Date(a.creationDate) - new Date(b.creationDate))
+          .reduce((r, v, i, a, k = v.repository.name) => ((r[k] || (r[k] = [])).push(v), r), {});
+        return pullRequestsGrouped;
+      }
+
+      getRepositoriesWithCommits()
+        .then(repositoriesWithCommits => {
+          elemContent.append(
+            el('h2', 'Commits'),
+            el('span',
+              repositoriesWithCommits
+                .filter(item => item.commits.count > 0)
+                .flatMap(
+                  item =>
+                    [
+                      el('h4', item.repository.name),
+                      el('ul',
+                        item.commits.value.map(commit =>
+                          el('li',
+                            el('div',
+                              el('small', `(${commit.commitId})`),
+                              ` ${commit.comment}`
+                            )
+                          )
+                        )
+                      )
+                    ]
+                )
+            )
+          )
+        });
+
+      getPullRequestsGrouped()
+        .then(pullRequestsGrouped => {
+          elemContent.append(el('h2', 'Pull Requests'));
+          for (const repositoryName in pullRequestsGrouped) {
+            const pullRequests = pullRequestsGrouped[repositoryName];
+            elemContent.append(
+              el('h3', repositoryName),
+              el('ul',
+                pullRequests.map(pr =>
+                  el('li',
+                    el('div',
+                      `(${pr.pullRequestId}) ${pr.title}`,
+                      el('br'),
+                      el('small', `${pr.url}`)
+                    ),
+                  )
+                )
+              )
+            );
+          }
+
+        });
     }
 
   </script>
