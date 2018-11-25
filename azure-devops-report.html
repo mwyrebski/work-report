@@ -89,11 +89,26 @@
       dateInput.oninput = () => store.setItem(name, dateInput.valueAsDate);
     }
 
+    const _main = document.getElementsByTagName('main')[0];
+    const _error = document.getElementById('error');
+    const _content = document.getElementById('content');
 
-    const elemMain = document.getElementsByTagName('main')[0];
-    const elemError = document.getElementById('error');
-    const elemContent = document.getElementById('content');
+    async function executeClick(button) {
+      _error.innerHTML = '';
+      button.disabled = true;
+      _main.style.display = 'none';
+      await loadAll().catch((err) => { _error.innerText = err; });
+      _main.style.display = '';
+      button.disabled = false;
+    }
 
+    async function loadAll() {
+      _content.innerHTML = '';
+      loadPullRequests(_content.appendChild(el('div')))
+      loadCommits(_content.appendChild(el('div')))
+    }
+
+    // ----
 
     function get(path, params) {
       const baseUrl = `https://dev.azure.com/${store.organization}/`;
@@ -126,27 +141,12 @@
       return e;
     }
 
-    function debug(title, data) {
-      document.body.append(
-        el('h1', title),
-        el('pre', JSON.stringify(data, null, 2))
-      );
-    }
-
-
-    async function executeClick(inputButton) {
-      elemError.innerHTML = '';
-      elemContent.innerHTML = '';
-      inputButton.disabled = true;
-      elemMain.style.display = 'none';
-      await load().catch((err) => { elemError.innerText = err; });
-      elemMain.style.display = '';
-      inputButton.disabled = false;
-    }
-
-    async function load() {
+    async function getUserId() {
       const connectionData = await get('_apis/connectionData');
-      const userId = connectionData.authenticatedUser.id;
+      return connectionData.authenticatedUser.id;
+    }
+
+    async function loadCommits(targetElement) {
 
       async function getRepositoriesWithCommits() {
         const repositories = await get(`cybervadis/_apis/git/repositories`, { includeLinks: false, includeHidden: true });
@@ -161,23 +161,11 @@
         return repositoriesWithCommits;
       }
 
-      async function getPullRequestsGrouped() {
-        const pullRequests = await Promise.all([
-          get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.creatorId': userId, 'searchCriteria.status': 'completed' }),
-          get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.reviewerId': userId })
-        ]);
-        const pullRequestsGrouped = pullRequests
-          .map(r => r.value)
-          .reduce((a, b) => a.concat(b))
-          .sort((a, b) => new Date(a.creationDate) - new Date(b.creationDate))
-          .reduce((r, v, i, a, k = v.repository.name) => ((r[k] || (r[k] = [])).push(v), r), {});
-        return pullRequestsGrouped;
-      }
+      targetElement.appendChild(el('h2', 'Commits'));
 
       getRepositoriesWithCommits()
         .then(repositoriesWithCommits => {
-          elemContent.append(
-            el('h2', 'Commits'),
+          targetElement.append(
             el('span',
               repositoriesWithCommits
                 .filter(item => item.commits.count > 0)
@@ -200,13 +188,31 @@
             )
           )
         });
+    }
+
+    async function loadPullRequests(targetElement) {
+
+      async function getPullRequestsGrouped() {
+        const userId = await getUserId();
+        const pullRequests = await Promise.all([
+          get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.creatorId': userId, 'searchCriteria.status': 'completed' }),
+          get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.reviewerId': userId })
+        ]);
+        const pullRequestsGrouped = pullRequests
+          .map(r => r.value)
+          .reduce((a, b) => a.concat(b))
+          .sort((a, b) => new Date(a.creationDate) - new Date(b.creationDate))
+          .reduce((r, v, i, a, k = v.repository.name) => ((r[k] || (r[k] = [])).push(v), r), {});
+        return pullRequestsGrouped;
+      }
+
+      targetElement.appendChild(el('h2', 'Pull requests'));
 
       getPullRequestsGrouped()
         .then(pullRequestsGrouped => {
-          elemContent.append(el('h2', 'Pull Requests'));
           for (const repositoryName in pullRequestsGrouped) {
             const pullRequests = pullRequestsGrouped[repositoryName];
-            elemContent.append(
+            targetElement.append(
               el('h3', repositoryName),
               el('ul',
                 pullRequests.map(pr =>
