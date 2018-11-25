@@ -183,7 +183,7 @@
                 .flatMap(
                   item =>
                     [
-                      el('h4', item.repository.name),
+                      el('h3', item.repository.name),
                       el('ul',
                         item.commits.value.map(commit =>
                           el('li',
@@ -211,14 +211,46 @@
 
     async function loadPullRequests(targetElement) {
 
+      async function getPagedPR(path, params) {
+        const size = 50;
+        let returnValue = new Array();
+
+        for (let count = 0; ; count++) {
+          let paramsPaged = Object.assign(
+            {
+              '$top': size,
+              '$skip': size * count
+            }, params);
+          let result = await get(path, paramsPaged);
+          let filtered = result.value
+            .filter(
+              pr => pr.status === 'completed'
+                ? new Date(pr.closedDate) >= new Date(store.from) && new Date(pr.closedDate) <= new Date(store.to)
+                : new Date(pr.creationDate) >= new Date(store.from) && new Date(pr.creationDate) <= new Date(store.to)
+            );
+          if (filtered.length === 0) {
+            break;
+          }
+          returnValue = returnValue.concat(filtered);
+        }
+
+        return returnValue;
+      }
+
       async function getPullRequestsGrouped() {
         const userId = await getUserId();
         const pullRequests = await Promise.all([
-          get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.creatorId': userId, 'searchCriteria.status': 'completed' }),
-          get('cybervadis/_apis/git/pullrequests', { 'searchCriteria.reviewerId': userId })
+          getPagedPR('_apis/git/pullrequests',
+            {
+              'searchCriteria.creatorId': userId,
+              'searchCriteria.status': 'completed'
+            }),
+          getPagedPR('_apis/git/pullrequests',
+            {
+              'searchCriteria.reviewerId': userId
+            })
         ]);
         const pullRequestsGrouped = pullRequests
-          .map(r => r.value)
           .reduce((a, b) => a.concat(b))
           .sort((a, b) => new Date(a.creationDate) - new Date(b.creationDate))
           .reduce((r, v, i, a, k = v.repository.name) => ((r[k] || (r[k] = [])).push(v), r), {});
@@ -237,11 +269,16 @@
                 pullRequests.map(pr =>
                   el('li',
                     el('div',
-                      `(#${pr.pullRequestId})`,
-                      ' ',
-                      `${pr.title}`.link(pr.url),
+                      `(#${pr.pullRequestId})`, ' ', `${pr.title}`.link(pr.url),
                       el('br'),
-                      el('small', `${pr.url}`)
+                      el('small',
+                        `Created: ${new Date(pr.creationDate).toLocaleString('pl')}`,
+                        pr.status === 'completed'
+                          ? ` | Closed: ${new Date(pr.closedDate).toLocaleString('pl')}`
+                          : '',
+                        el('br'),
+                        pr.url
+                      )
                     ),
                   )
                 )
