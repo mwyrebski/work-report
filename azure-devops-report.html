@@ -184,22 +184,23 @@
                   item =>
                     [
                       el('h3', item.repository.name),
-                      el('ul',
-                        item.commits.value.map(commit =>
-                          el('li',
-                            el('div',
-                              `${commit.comment}`.link(commit.url),
-                              el('div',
+                      el('ol',
+                        item.commits.value.map(
+                          commit =>
+                            el('li',
+                              el('p',
+                                `${commit.comment}`.link(commit.url),
+                                el('br'),
                                 el('small',
                                   `Commit: ${commit.commitId}`,
                                   ` | `,
                                   `Date: ${new Date(commit.author.date).toLocaleString('pl')}`,
                                   el('br'),
                                   commit.url
-                                ),
+                                )
+
                               )
                             )
-                          )
                         )
                       )
                     ]
@@ -265,11 +266,11 @@
             const pullRequests = pullRequestsGrouped[repositoryName];
             targetElement.append(
               el('h3', repositoryName),
-              el('ul',
+              el('ol',
                 pullRequests.map(pr =>
                   el('li',
-                    el('div',
-                      `(#${pr.pullRequestId})`, ' ', `${pr.title}`.link(pr.url),
+                    el('p',
+                      `(#${pr.pullRequestId}) `, `${pr.title}`.link(pr.url),
                       el('br'),
                       el('small',
                         `Created: ${new Date(pr.creationDate).toLocaleString('pl')}`,
