@@ -150,7 +150,7 @@
     async function loadCommits(targetElement) {
 
       async function getRepositoriesWithCommits() {
-        const repositories = await get(`cybervadis/_apis/git/repositories`,
+        const repositories = await get(`_apis/git/repositories`,
           {
             includeLinks: false,
             includeHidden: true
@@ -158,7 +158,7 @@
         const repositoriesWithCommits = await Promise.all(
           repositories.value.map(
             repository =>
-              get(`cybervadis/_apis/git/repositories/${repository.id}/commits`,
+              get(`_apis/git/repositories/${repository.id}/commits`,
                 {
                   'searchCriteria.author': store.username,
                   'searchCriteria.fromDate': new Date(store.from).toISOString(),
