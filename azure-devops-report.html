@@ -111,6 +111,15 @@
 
     // ----
 
+    class LocalDate {
+      constructor(value) {
+        this.date = new Date(value);
+      }
+      toString() {
+        return this.date.toLocaleString('pl');
+      }
+    }
+
     function get(path, params) {
       const baseUrl = `https://dev.azure.com/${store.organization}/`;
       const url = new URL(path, baseUrl);
@@ -194,7 +203,7 @@
                                 el('small',
                                   `Commit: ${commit.commitId}`,
                                   ` | `,
-                                  `Date: ${new Date(commit.author.date).toLocaleString('pl')}`,
+                                  `Date: ${new LocalDate(commit.author.date)}`,
                                   el('br'),
                                   commit.url
                                 )
@@ -273,9 +282,9 @@
                       `(#${pr.pullRequestId}) `, `${pr.title}`.link(pr.url),
                       el('br'),
                       el('small',
-                        `Created: ${new Date(pr.creationDate).toLocaleString('pl')}`,
+                        `Created: ${new LocalDate(pr.creationDate)}`,
                         pr.status === 'completed'
-                          ? ` | Closed: ${new Date(pr.closedDate).toLocaleString('pl')}`
+                          ? ` | Closed: ${new LocalDate(pr.closedDate)}`
                           : '',
                         el('br'),
                         pr.url
