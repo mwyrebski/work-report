@@ -89,9 +89,9 @@
       dateInput.oninput = () => store.setItem(name, dateInput.valueAsDate);
     }
 
-    const _main = document.getElementsByTagName('main')[0];
-    const _error = document.getElementById('error');
-    const _content = document.getElementById('content');
+    const _main = document.querySelector('main');
+    const _error = document.querySelector('#error');
+    const _content = document.querySelector('#content');
 
     async function executeClick(button) {
       _error.innerHTML = '';
