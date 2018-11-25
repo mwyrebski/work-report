@@ -13,6 +13,7 @@
     body {
       margin: 0;
       font-size: 12pt;
+      line-height: 1.5;
     }
 
     header {
@@ -21,7 +22,7 @@
       box-shadow: #aaa 0 0 1em;
       user-select: none;
     }
-    
+
     header > div {
       margin: 10px 0;
     }
@@ -149,13 +150,23 @@
     async function loadCommits(targetElement) {
 
       async function getRepositoriesWithCommits() {
-        const repositories = await get(`cybervadis/_apis/git/repositories`, { includeLinks: false, includeHidden: true });
+        const repositories = await get(`cybervadis/_apis/git/repositories`,
+          {
+            includeLinks: false,
+            includeHidden: true
+          });
         const repositoriesWithCommits = await Promise.all(
           repositories.value.map(
-            repository => get(`cybervadis/_apis/git/repositories/${repository.id}/commits`, { 'searchCriteria.author': store.username })
-              .then(commits => {
-                return { repository, commits }
-              })
+            repository =>
+              get(`cybervadis/_apis/git/repositories/${repository.id}/commits`,
+                {
+                  'searchCriteria.author': store.username,
+                  'searchCriteria.fromDate': new Date(store.from).toISOString(),
+                  'searchCriteria.toDate': new Date(new Date(store.to).setMinutes(24 * 60 - 1)).toISOString()
+                })
+                .then(commits => {
+                  return { repository, commits }
+                })
           )
         )
         return repositoriesWithCommits;
@@ -177,8 +188,12 @@
                         item.commits.value.map(commit =>
                           el('li',
                             el('div',
-                              el('small', `(${commit.commitId})`),
-                              ` ${commit.comment}`
+                              `${commit.comment}`.link(commit.url),
+                              el('div',
+                                el('small',
+                                  `(Commit: ${commit.commitId},
+                                        Date: ${new Date(commit.author.date).toLocaleString('pl')})`),
+                              )
                             )
                           )
                         )
