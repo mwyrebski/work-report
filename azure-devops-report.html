@@ -158,33 +158,30 @@
 
     async function loadCommits(targetElement) {
 
-      async function getRepositoriesWithCommits() {
-        const repositories = await get(`_apis/git/repositories`,
-          {
-            includeLinks: false,
-            includeHidden: true
-          });
-        const repositoriesWithCommits = await Promise.all(
-          repositories.value.map(
-            repository =>
-              get(`_apis/git/repositories/${repository.id}/commits`,
-                {
-                  'searchCriteria.author': store.username,
-                  'searchCriteria.fromDate': new Date(store.from).toISOString(),
-                  'searchCriteria.toDate': new Date(new Date(store.to).setMinutes(24 * 60 - 1)).toISOString()
-                })
-                .then(commits => {
-                  return { repository, commits }
-                })
-          )
-        )
-        return repositoriesWithCommits;
-      }
-
       targetElement.appendChild(el('h2', 'Commits'));
 
-      getRepositoriesWithCommits()
-        .then(repositoriesWithCommits => {
+      get(`_apis/git/repositories`,
+        {
+          includeLinks: false,
+          includeHidden: true
+        })
+        .then(repositories =>
+          Promise.all(
+            repositories.value.map(
+              repository =>
+                get(`_apis/git/repositories/${repository.id}/commits`,
+                  {
+                    'searchCriteria.author': store.username,
+                    'searchCriteria.fromDate': new Date(store.from).toISOString(),
+                    'searchCriteria.toDate': new Date(new Date(store.to).setMinutes(24 * 60 - 1)).toISOString()
+                  })
+                  .then(commits => {
+                    return { repository, commits }
+                  })
+            )
+          )
+        )
+        .then(repositoriesWithCommits =>
           repositoriesWithCommits
             .filter(item => item.commits.count > 0)
             .flatMap(item =>
@@ -211,8 +208,8 @@
                 )
               ]
             )
-            .map(e => targetElement.append(e));
-        });
+            .map(e => targetElement.appendChild(e))
+        )
     }
 
     async function loadPullRequests(targetElement) {
@@ -243,56 +240,55 @@
         return returnValue;
       }
 
-      async function getPullRequestsGrouped() {
-        const userId = await getUserId();
-        const pullRequests = await Promise.all([
-          getPagedPR('_apis/git/pullrequests',
-            {
-              'searchCriteria.creatorId': userId,
-              'searchCriteria.status': 'completed'
-            }),
-          getPagedPR('_apis/git/pullrequests',
-            {
-              'searchCriteria.reviewerId': userId
-            })
-        ]);
-        const pullRequestsGrouped = pullRequests
-          .reduce((a, b) => a.concat(b))
-          .sort((a, b) => new Date(a.creationDate) - new Date(b.creationDate))
-          .reduce((r, v, i, a, k = v.repository.name) => ((r[k] || (r[k] = [])).push(v), r), {});
-        return pullRequestsGrouped;
-      }
-
       targetElement.appendChild(el('h2', 'Pull requests'));
 
-      getPullRequestsGrouped()
-        .then(pullRequestsGrouped => {
-          for (const repositoryName in pullRequestsGrouped) {
-            const pullRequests = pullRequestsGrouped[repositoryName];
-            targetElement.append(
-              el('h3', repositoryName),
-              el('ol',
-                pullRequests.map(pr =>
-                  el('li',
-                    el('p',
-                      `(#${pr.pullRequestId}) `, `${pr.title}`.link(pr.url),
-                      el('br'),
-                      el('small',
-                        `Created: ${new LocalDate(pr.creationDate)}`,
-                        pr.status === 'completed'
-                          ? ` | Closed: ${new LocalDate(pr.closedDate)}`
-                          : '',
+      getUserId()
+        .then(userId =>
+          Promise.all(
+            [
+              getPagedPR('_apis/git/pullrequests',
+                {
+                  'searchCriteria.creatorId': userId,
+                  'searchCriteria.status': 'completed'
+                }),
+              getPagedPR('_apis/git/pullrequests',
+                {
+                  'searchCriteria.reviewerId': userId
+                })
+            ])
+        )
+        .then(pullRequests =>
+          pullRequests
+            .reduce((a, b) => a.concat(b))
+            .sort((a, b) => new Date(a.creationDate) - new Date(b.creationDate))
+            .reduce((r, v, i, a, k = v.repository.name) => ((r[k] || (r[k] = [])).push(v), r), {})
+        )
+        .then(groups =>
+          Object.entries(groups).forEach(
+            ([repositoryName, pullRequests]) =>
+              targetElement.append(
+                el('h3', repositoryName),
+                el('ol',
+                  pullRequests.map(pr =>
+                    el('li',
+                      el('p',
+                        `(#${pr.pullRequestId}) `, `${pr.title}`.link(pr.url),
                         el('br'),
-                        pr.url
-                      )
-                    ),
+                        el('small',
+                          `Created: ${new LocalDate(pr.creationDate)}`,
+                          pr.status === 'completed'
+                            ? ` | Closed: ${new LocalDate(pr.closedDate)}`
+                            : '',
+                          el('br'),
+                          pr.url
+                        )
+                      ),
+                    )
                   )
                 )
               )
-            );
-          }
-
-        });
+          )
+        )
     }
 
   </script>
