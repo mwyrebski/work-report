@@ -185,37 +185,33 @@
 
       getRepositoriesWithCommits()
         .then(repositoriesWithCommits => {
-          targetElement.append(
-            el('span',
-              repositoriesWithCommits
-                .filter(item => item.commits.count > 0)
-                .flatMap(
-                  item =>
-                    [
-                      el('h3', item.repository.name),
-                      el('ol',
-                        item.commits.value.map(
-                          commit =>
-                            el('li',
-                              el('p',
-                                `${commit.comment}`.link(commit.url),
-                                el('br'),
-                                el('small',
-                                  `Commit: ${commit.commitId}`,
-                                  ` | `,
-                                  `Date: ${new LocalDate(commit.author.date)}`,
-                                  el('br'),
-                                  commit.url
-                                )
+          repositoriesWithCommits
+            .filter(item => item.commits.count > 0)
+            .flatMap(item =>
+              [
+                el('h3', item.repository.name),
+                el('ol',
+                  item.commits.value.map(
+                    commit =>
+                      el('li',
+                        el('p',
+                          `${commit.comment}`.link(commit.remoteUrl),
+                          el('br'),
+                          el('small',
+                            `Commit: ${commit.commitId}`,
+                            ` | `,
+                            `Date: ${new LocalDate(commit.author.date)}`,
+                            el('br'),
+                            commit.remoteUrl
+                          )
 
-                              )
-                            )
                         )
                       )
-                    ]
+                  )
                 )
+              ]
             )
-          )
+            .map(e => targetElement.append(e));
         });
     }
 
