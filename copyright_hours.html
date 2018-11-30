@@ -1,0 +1,69 @@
+<html>
+<style>
+    body {
+        margin: 2em;
+    }
+
+    textarea {
+        margin: auto;
+        width: 200px;
+        height: 500px;
+    }
+</style>
+
+<body>
+    <div style="float:left">
+        <textarea id="output" readonly></textarea>
+    </div>
+    <div style="float:left; margin-left: 2em">
+        <div><input type="range" id="slide" min="0" max="4" oninput="print()"></div>
+        <div>&nbsp;</div>
+        <div><input type="button" value="Recalculate" onclick="calculate();print()"></div>
+    </div>
+    <script>
+
+        const share = 0.7;
+        const daysCount = 21;
+        const maxHours = daysCount * 8;
+        const maxCopyrightHours = daysCount * 8 * share;
+
+        const output = document.getElementById("output");
+        const slide = document.getElementById("slide");
+
+        let days;
+
+        calculate();
+        print();
+
+        function random(max) {
+            return Math.round(Math.random() % max);
+        }
+
+        function calculate() {
+            days = new Array(daysCount);
+            let sumCopyrightHours = 0;
+            for (let i = 0; sumCopyrightHours < maxCopyrightHours; i++) {
+                const p = (i + random(3)) % daysCount;
+                if (!days[p]) {
+                    days[p] = { norm: 8, share: 0 };
+                }
+                if (days[p].norm > random(2) + 1) {
+                    days[p].norm -= 1;
+                    days[p].share += 1;
+                    ++sumCopyrightHours;
+                }
+            }
+            console.log("sumCopyrightHours", sumCopyrightHours);
+            console.log("maxCopyrightHours", maxCopyrightHours);
+        }
+
+        function print() {
+            output.innerText = "";
+            for (let i = 0; i < days.length; i++) {
+                const d = days[i];
+                output.append(`${d.norm}\t${d.share}\n`)
+                if (i % 5 == slide.value)
+                    output.append("\n\n");
+            }
+        }
+    </script>
