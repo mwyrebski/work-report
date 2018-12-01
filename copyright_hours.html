@@ -1,69 +1,120 @@
 <html>
-<style>
-    body {
-        margin: 2em;
-    }
 
-    textarea {
-        margin: auto;
-        width: 200px;
-        height: 500px;
-    }
-</style>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+                margin: 2rem;
+                font-size: 120%;
+                font-family: sans-serif;
+            }
+        
+            textarea {
+                padding: 0.5em;
+                width: 200px;
+                height: 40rem;
+                font-size: 100%;
+            }
+        
+            input { 
+                font-size: 100%;
+            }
+        </style>
+</head>
 
 <body>
-    <div style="float:left">
+    <section style="float:left">
         <textarea id="output" readonly></textarea>
-    </div>
-    <div style="float:left; margin-left: 2em">
-        <div><input type="range" id="slide" min="0" max="4" oninput="print()"></div>
-        <div>&nbsp;</div>
-        <div><input type="button" value="Recalculate" onclick="calculate();print()"></div>
-    </div>
+    </section>
+    <aside style="float:left; margin-left: 2rem">
+        <p>
+            Max copyright hours: <strong id="maxHoursText">0</strong>
+        </p>
+        <p>
+            Sum copyright hours: <strong id="sumHoursText">0</strong>
+        </p>
+        <p>
+            Copyright share: <input type="number" id="share" value="70" min="0" max="80" oninput="run()">%
+        </p>
+        <p>
+            Work days: <input type="number" id="daysCount" value="20" min="1" max="31" oninput="run()">
+        </p>
+        <p>
+            Shift: <input type="range" id="slide" min="0" max="5" oninput="days.print()">
+        </p>
+        <p>
+            <input type="button" value="Recalculate" onclick="run()">
+        </p>
+        <p>
+            <input type="button" value="Copy" onclick="copy()">
+        </p>
+    </aside>
+
     <script>
-
-        const share = 0.7;
-        const daysCount = 21;
-        const maxHours = daysCount * 8;
-        const maxCopyrightHours = daysCount * 8 * share;
-
+        const share = document.getElementById("share");
         const output = document.getElementById("output");
         const slide = document.getElementById("slide");
+        const daysCount = document.getElementById("daysCount");
+        const maxHoursText = document.getElementById("maxHoursText");
+        const sumHoursText = document.getElementById("sumHoursText");
 
-        let days;
+        let days = null;
 
-        calculate();
-        print();
+        function random(max) { return Math.floor(Math.random() * max); }
 
-        function random(max) {
-            return Math.round(Math.random() % max);
-        }
+        class Days {
+            constructor(count) {
+                this.count = parseInt(count);
+                this.list = new Array(count);
+            }
 
-        function calculate() {
-            days = new Array(daysCount);
-            let sumCopyrightHours = 0;
-            for (let i = 0; sumCopyrightHours < maxCopyrightHours; i++) {
-                const p = (i + random(3)) % daysCount;
-                if (!days[p]) {
-                    days[p] = { norm: 8, share: 0 };
+            maxCopyrightHours() { return this.count * 8 * (share.value / 100); }
+
+            calculate() {
+                for (let i = 0; i < this.count; i++) {
+                    this.list[i] = { norm: 8, copy: 0 };
                 }
-                if (days[p].norm > random(2) + 1) {
-                    days[p].norm -= 1;
-                    days[p].share += 1;
-                    ++sumCopyrightHours;
+                const maxHours = this.maxCopyrightHours();
+                let sumHours = 0;
+                for (let i = 0; sumHours < maxHours; i++) {
+                    const p = (i + random(5)) % this.count;
+                    const e = this.list[p];
+                    if (e.norm > 1) {
+                        e.norm -= 1;
+                        e.copy += 1;
+                        ++sumHours;
+                    }
+                }
+                maxHoursText.innerText = Math.round(maxHours * 100) / 100;
+                sumHoursText.innerText = Math.round(sumHours * 100) / 100;
+            }
+
+            print() {
+                output.innerText = "";
+                for (let i = 0; i < this.list.length; i++) {
+                    const d = this.list[i];
+                    output.append(`${d.norm}\t${d.copy}\n`)
+                    if (slide.value > 0 && i % 5 == slide.value - 1)
+                        output.append("\n\n");
                 }
             }
-            console.log("sumCopyrightHours", sumCopyrightHours);
-            console.log("maxCopyrightHours", maxCopyrightHours);
         }
 
-        function print() {
-            output.innerText = "";
-            for (let i = 0; i < days.length; i++) {
-                const d = days[i];
-                output.append(`${d.norm}\t${d.share}\n`)
-                if (i % 5 == slide.value)
-                    output.append("\n\n");
-            }
+        function run() {
+            days = new Days(daysCount.value);
+            days.calculate();
+            days.print();
         }
+
+        function copy() {
+            output.select();
+            document.execCommand("copy");
+        }
+
+        run();
+
     </script>
+
+</body>
+
+</html>
