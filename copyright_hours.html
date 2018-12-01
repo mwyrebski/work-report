@@ -3,30 +3,41 @@
 <head>
     <meta charset="utf-8">
     <style>
+        html {
+            background-color: #eee;
+        }
+
         body {
-                margin: 2rem;
-                font-size: 120%;
-                font-family: sans-serif;
-            }
+            width: 50rem;
+            margin: 2rem auto;
+            padding: 2rem;
+            font-size: 120%;
+            font-family: sans-serif;
+            box-shadow: #aaa 0 0 1em;
+            background-color: white;
+            display: flex;
+            justify-content: space-evenly;
+        }
         
-            textarea {
-                padding: 0.5em;
-                width: 200px;
-                height: 40rem;
-                font-size: 100%;
-            }
-        
-            input { 
-                font-size: 100%;
-            }
-        </style>
+        textarea {
+            padding: 0.5em;
+            width: 200px;
+            height: 40rem;
+            font-size: 100%;
+            border: 2px solid #ccc;
+        }
+    
+        input { 
+            font-size: 100%;
+        }
+    </style>
 </head>
 
 <body>
-    <section style="float:left">
+    <section>
         <textarea id="output" readonly></textarea>
     </section>
-    <aside style="float:left; margin-left: 2rem">
+    <aside>
         <p>
             Max copyright hours: <strong id="maxHoursText">0</strong>
         </p>
