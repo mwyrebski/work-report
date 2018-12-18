@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
+    h1 { font-size: 200%; }
+    h2 { font-size: 160%; }
+    h3 { font-size: 130%; }
+
     html {
       background-color: #eee;
       font-family: sans-serif;
@@ -42,10 +46,6 @@
 
     small {
       font-size: 8pt;
-    }
-
-    h3 + div > div {
-      margin-top: 1em;
     }
   </style>
 </head>
@@ -203,8 +203,9 @@
                           `Date: ${new LocalDate(commit.author.date)}`,
                           el('br'),
                           commit.remoteUrl
-                        )
-
+                        ),
+                        el('br'),
+                        el('br')
                       )
                   )
                 )
@@ -283,7 +284,9 @@
                           : '',
                         el('br'),
                         pr.url
-                      )
+                      ),
+                      el('br'),
+                      el('br')
                     )
                   )
                 )
