@@ -43,6 +43,10 @@
     small {
       font-size: 8pt;
     }
+
+    h3 + div > div {
+      margin-top: 1em;
+    }
   </style>
 </head>
 
@@ -171,9 +175,9 @@
               repository =>
                 get(`_apis/git/repositories/${repository.id}/commits`,
                   {
-                    'searchCriteria.author': store.username,
-                    'searchCriteria.fromDate': new Date(store.from).toISOString(),
-                    'searchCriteria.toDate': new Date(new Date(store.to).setMinutes(24 * 60 - 1)).toISOString()
+                    'author': store.username,
+                    'fromDate': new Date(store.from).toISOString(),
+                    'toDate': new Date(new Date(store.to).setMinutes(24 * 60 - 1)).toISOString()
                   })
                   .then(commits => {
                     return { repository, commits }
@@ -187,22 +191,20 @@
             .flatMap(item =>
               [
                 el('h3', item.repository.name),
-                el('ol',
+                el('div',
                   item.commits.value.map(
                     commit =>
-                      el('li',
-                        el('p',
-                          `${commit.comment}`.link(commit.remoteUrl),
+                      el('div',
+                        `${commit.comment}`.link(commit.remoteUrl),
+                        el('br'),
+                        el('small',
+                          `Commit: ${commit.commitId}`,
+                          ` | `,
+                          `Date: ${new LocalDate(commit.author.date)}`,
                           el('br'),
-                          el('small',
-                            `Commit: ${commit.commitId}`,
-                            ` | `,
-                            `Date: ${new LocalDate(commit.author.date)}`,
-                            el('br'),
-                            commit.remoteUrl
-                          )
-
+                          commit.remoteUrl
                         )
+
                       )
                   )
                 )
@@ -231,7 +233,7 @@
                 ? new Date(pr.closedDate) >= new Date(store.from) && new Date(pr.closedDate) <= new Date(store.to)
                 : new Date(pr.creationDate) >= new Date(store.from) && new Date(pr.creationDate) <= new Date(store.to)
             );
-          if (filtered.length === 0) {
+          if (result.count === 0) {
             break;
           }
           returnValue = returnValue.concat(filtered);
@@ -248,12 +250,13 @@
             [
               getPagedPR('_apis/git/pullrequests',
                 {
-                  'searchCriteria.creatorId': userId,
-                  'searchCriteria.status': 'completed'
+                  'status': 'All',
+                  'creatorId': userId
                 }),
               getPagedPR('_apis/git/pullrequests',
                 {
-                  'searchCriteria.reviewerId': userId
+                  'status': 'All',
+                  'reviewerId': userId
                 })
             ])
         )
@@ -268,21 +271,19 @@
             ([repositoryName, pullRequests]) =>
               targetElement.append(
                 el('h3', repositoryName),
-                el('ol',
+                el('div',
                   pullRequests.map(pr =>
-                    el('li',
-                      el('p',
-                        `(#${pr.pullRequestId}) `, `${pr.title}`.link(pr.url),
+                    el('div',
+                      `(#${pr.pullRequestId}) `, `${pr.title}`.link(pr.url),
+                      el('br'),
+                      el('small',
+                        `Created: ${new LocalDate(pr.creationDate)}`,
+                        pr.status === 'completed'
+                          ? ` | Closed: ${new LocalDate(pr.closedDate)}`
+                          : '',
                         el('br'),
-                        el('small',
-                          `Created: ${new LocalDate(pr.creationDate)}`,
-                          pr.status === 'completed'
-                            ? ` | Closed: ${new LocalDate(pr.closedDate)}`
-                            : '',
-                          el('br'),
-                          pr.url
-                        )
-                      ),
+                        pr.url
+                      )
                     )
                   )
                 )
