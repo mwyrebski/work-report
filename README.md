@@ -1,7 +1,7 @@
 Work report
 ===========
 
-Scripts which help to generate work time reports.
+Scripts that help generating work time reports.
 
 
 License
