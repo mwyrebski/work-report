@@ -108,7 +108,10 @@
     }
 
     async function loadAll() {
+      const from = new Date(store.from).toLocaleDateString('pl')
+      const to = new Date(store.to).toLocaleDateString('pl')
       _content.innerHTML = '';
+      _content.appendChild(el('h1', `Report: ${from} - ${to}`));
       loadPullRequests(_content.appendChild(el('div')))
       loadCommits(_content.appendChild(el('div')))
     }
