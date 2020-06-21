@@ -18,7 +18,7 @@
             display: flex;
             justify-content: space-evenly;
         }
-        
+
         textarea {
             padding: 0.5em;
             width: 200px;
@@ -26,8 +26,8 @@
             font-size: 100%;
             border: 2px solid #ccc;
         }
-    
-        input { 
+
+        input {
             font-size: 100%;
         }
     </style>
@@ -35,7 +35,7 @@
 
 <body>
     <section>
-        <textarea id="output" readonly></textarea>
+        <textarea id="output"></textarea>
     </section>
     <aside>
         <p>
@@ -51,10 +51,14 @@
             Work days: <input type="number" id="daysCount" value="20" min="1" max="31" oninput="run()">
         </p>
         <p>
-            Shift: <input type="range" id="slide" min="0" max="5" oninput="days.print()">
+            Round down: <input type="checkbox" id="roundDown" checked oninput="run()">
         </p>
         <p>
             <input type="button" value="Recalculate" onclick="run()">
+        </p>
+        <hr>
+        <p>
+            Shift week: <input type="range" id="slide" min="0" max="5" oninput="print()">
         </p>
         <p>
             <input type="button" value="Copy" onclick="copy()">
@@ -66,55 +70,59 @@
         const output = document.getElementById("output");
         const slide = document.getElementById("slide");
         const daysCount = document.getElementById("daysCount");
+        const roundDown = document.getElementById("roundDown");
         const maxHoursText = document.getElementById("maxHoursText");
         const sumHoursText = document.getElementById("sumHoursText");
 
-        let days = null;
+        const random = (max) => Math.floor(Math.random() * max);
 
-        function random(max) { return Math.floor(Math.random() * max); }
+        const round2 = (value) => Math.round(value * 100) / 100;
 
-        class Days {
-            constructor(count) {
-                this.count = parseInt(count);
-                this.list = new Array(count);
+        const calculate = (daysCount, shareRate, roundDown) => {
+            const list = new Array(daysCount);
+            for (let i = 0; i < daysCount; i++) {
+                list[i] = { normal: 8, copyright: 0 };
             }
-
-            maxCopyrightHours() { return this.count * 8 * (share.value / 100); }
-
-            calculate() {
-                for (let i = 0; i < this.count; i++) {
-                    this.list[i] = { norm: 8, copy: 0 };
+            const maxCopyrightHours = daysCount * 8 * shareRate;
+            const maxHours = roundDown ? Math.floor(maxCopyrightHours) : maxCopyrightHours;
+            let sumHours = 0;
+            for (let i = 0; sumHours < maxHours; i++) {
+                const p = (i + random(5)) % daysCount;
+                const e = list[p];
+                if (e.normal > 1) {
+                    e.normal -= 1;
+                    e.copyright += 1;
+                    ++sumHours;
                 }
-                const maxHours = this.maxCopyrightHours();
-                let sumHours = 0;
-                for (let i = 0; sumHours < maxHours; i++) {
-                    const p = (i + random(5)) % this.count;
-                    const e = this.list[p];
-                    if (e.norm > 1) {
-                        e.norm -= 1;
-                        e.copy += 1;
-                        ++sumHours;
-                    }
-                }
-                maxHoursText.innerText = Math.round(maxHours * 100) / 100;
-                sumHoursText.innerText = Math.round(sumHours * 100) / 100;
             }
-
-            print() {
-                output.innerText = "";
-                for (let i = 0; i < this.list.length; i++) {
-                    const d = this.list[i];
-                    output.append(`${d.norm}\t${d.copy}\n`)
-                    if (slide.value > 0 && i % 5 == slide.value - 1)
-                        output.append("\n\n");
-                }
+            return {
+                maxCopyrightHours: round2(maxCopyrightHours),
+                sumCopyrightHours: round2(sumHours),
+                hours: list
             }
         }
 
+        const format = (hours, shift) => {
+            const out = hours.map((h, i) => {
+                const eol = shift > 0 && i % 5 == shift - 1 ? '\n' : '';
+                return `${h.normal}\t${h.copyright}${eol}`
+            })
+            return out.join('\n')
+        }
+
+        // ---
+
+        let result = null;
+
         function run() {
-            days = new Days(daysCount.value);
-            days.calculate();
-            days.print();
+            result = calculate(daysCount.value, share.value/100, roundDown.checked)
+            print()
+        }
+
+        function print() {
+            output.value = format(result.hours, slide.value)
+            maxHoursText.innerText = result.maxCopyrightHours
+            sumHoursText.innerText = result.sumCopyrightHours
         }
 
         function copy() {
