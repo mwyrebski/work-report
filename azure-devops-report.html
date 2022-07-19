@@ -174,18 +174,20 @@
         })
         .then(repositories =>
           Promise.all(
-            repositories.value.map(
-              repository =>
-                get(`_apis/git/repositories/${repository.id}/commits`,
-                  {
-                    'author': store.username,
-                    'fromDate': new Date(store.from).toISOString(),
-                    'toDate': new Date(new Date(store.to).setMinutes(24 * 60 - 1)).toISOString()
-                  })
-                  .then(commits => {
-                    return { repository, commits }
-                  })
-            )
+            repositories.value
+              .filter(repo => repo.isDisabled === false)
+              .map(
+                repository =>
+                  get(`_apis/git/repositories/${repository.id}/commits`,
+                    {
+                      'author': store.username,
+                      'fromDate': new Date(store.from).toISOString(),
+                      'toDate': new Date(new Date(store.to).setMinutes(24 * 60 - 1)).toISOString()
+                    })
+                    .then(commits => {
+                      return { repository, commits }
+                    })
+              )
           )
         )
         .then(repositoriesWithCommits =>
