@@ -90,6 +90,8 @@
       <input type="date" name="to" required>
       <input type="checkbox" id=include_author name="include_author">
       <label for="include_author">Include Author</label>
+      <input type="checkbox" id=include_description name="include_description">
+      <label for="include_description">Include PR Description</label>
       <button onclick="executeClick(this)" data-ready="Execute" data-working="Executing...">Execute</button>
     </div>
     <nav hidden>
@@ -115,7 +117,7 @@
       input.value = store.getItem(name);
       input.oninput = () => store.setItem(name, input.value);
     }
-    for (const name of ['include_author']) {
+    for (const name of ['include_author', 'include_description']) {
       const input = document.getElementsByName(name)[0];
       input.checked = store.getItem(name) === 'true';
       input.oninput = () => store.setItem(name, input.checked ? 'true' : '');
@@ -249,7 +251,9 @@
               item.commits.value.map(commit =>
                 el('div',
                   el('div', href(commit.comment, commit.remoteUrl)),
-                  el('small', `Commit: ${commit.commitId} | Date: ${formatDateTime(commit.author.date)}`)
+                  el('small',
+                    `Commit: ${commit.commitId} | Date: ${formatDateTime(commit.author.date)}`,
+                    store.include_author ? ` | Author: ${commit.author.email}` : '')
                 )
               )
             )
@@ -301,40 +305,42 @@
         .sort((a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase()));
 
       for (const [repositoryName, pullRequests] of tupleSortedByRepositoryName) {
-        targetElement.append(
-          el('h3', repositoryName),
-          el('div',
-            pullRequests.map(pr => {
-              const url = new URL(`${pr.repository.project.name}/_git/${repositoryName}/pullrequest/${pr.pullRequestId}`, baseUrl);
+        const section =
+          el('section',
+            el('h3', repositoryName),
+            el('div',
+              pullRequests.map(pr => {
+                const url = new URL(`${pr.repository.project.name}/_git/${repositoryName}/pullrequest/${pr.pullRequestId}`, baseUrl);
 
-              const details =
-                el('div',
-                  `Created: ${formatDateTime(pr.creationDate)}`,
-                  pr.status === 'completed'
-                    ? ` | Closed: ${formatDateTime(pr.closedDate)}`
-                    : '',
-                  store.include_author ? ` | Author: ${pr.createdBy.uniqueName}` : ''
-                );
-
-              const description =
-                pr.description ?
+                const details =
                   el('div',
-                    el('div', 'Description:'),
-                    el('pre', pr.description + (pr.description.length > 400 ? ' ...' : ''))
-                  )
-                  : '';
+                    `Created: ${formatDateTime(pr.creationDate)}`,
+                    pr.status === 'completed'
+                      ? ` | Closed: ${formatDateTime(pr.closedDate)}`
+                      : '',
+                    store.include_author ? ` | Author: ${pr.createdBy.uniqueName}` : ''
+                  );
 
-              return el('div',
-                el('span', `[${pr.pullRequestId}] `), href(pr.title, url),
-                el('small',
-                  details,
-                  description,
-                ),
-              );
-            }
+                const description =
+                  store.include_description && pr.description ?
+                    el('div',
+                      el('div', 'Description:'),
+                      el('pre', pr.description + (pr.description.length > 400 ? ' ...' : ''))
+                    )
+                    : '';
+
+                return el('div',
+                  el('span', `[${pr.pullRequestId}] `), href(pr.title, url),
+                  el('small',
+                    details,
+                    description,
+                  ),
+                );
+              }
+              )
             )
-          )
-        )
+          );
+        targetElement.append(section)
       }
 
     }
