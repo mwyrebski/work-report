@@ -68,6 +68,14 @@
       header>div {
         margin: 10px 0;
       }
+
+      fieldset:has(legend input[type="checkbox"]:not(:checked)) {
+        opacity: 0.5;
+      }
+
+      fieldset:has(legend input[type="checkbox"]:not(:checked)) input:not([type="checkbox"]) {
+        pointer-events: none;
+      }
     }
   </style>
 </head>
@@ -75,25 +83,46 @@
 <body>
 
   <header>
-    <div>
-      <label for="organization">Organization:</label>
-      <input type="text" name="organization" required>
-      <label for="username">Username:</label>
-      <input type="text" name="username" required>
-      <label for="token">Token:</label>
-      <input type="password" name="token" required>
-    </div>
+    <fieldset>
+      <legend>
+        <input type="checkbox" id="enable_azdo" name="enable_azdo">
+        <label for="enable_azdo">Azure DevOps</label>
+      </legend>
+      <div>
+        <label for="azdo_organization">Organization:</label>
+        <input type="text" name="azdo_organization" required>
+        <label for="azdo_username">Username:</label>
+        <input type="text" name="azdo_username" required>
+        <label for="azdo_token">Token:</label>
+        <input type="password" name="azdo_token" required>
+      </div>
+    </fieldset>
+    
+    <fieldset>
+      <legend>
+        <input type="checkbox" id="enable_github" name="enable_github">
+        <label for="enable_github">GitHub</label>
+      </legend>
+      <div>
+        <label for="github_token">Token:</label>
+        <input type="password" name="github_token">
+        <label for="github_org">Organization:</label>
+        <input type="text" name="github_org">
+      </div>
+    </fieldset>
+    
     <div>
       <label for="from">From:</label>
       <input type="date" name="from" required>
       <label for="to">To:</label>
       <input type="date" name="to" required>
-      <input type="checkbox" id=include_author name="include_author">
+      <input type="checkbox" id="include_author" name="include_author">
       <label for="include_author">Include Author</label>
-      <input type="checkbox" id=include_description name="include_description">
+      <input type="checkbox" id="include_description" name="include_description">
       <label for="include_description">Include PR Description</label>
       <button onclick="executeClick(this)" data-ready="Execute" data-working="Executing...">Execute</button>
     </div>
+    
     <nav hidden>
       <button onclick="window.print()">Print</button>
       <button onclick="copyToClipboard(this)">Copy to clipboard</button>
@@ -112,16 +141,19 @@
       store.from = new Date(new Date().setMonth(new Date().getMonth() - 1));
       store.to = new Date();
     }
-    for (const name of ['organization', 'username', 'token']) {
+    for (const name of ['azdo_organization', 'azdo_username', 'azdo_token', 'github_token', 'github_org']) {
       const input = document.getElementsByName(name)[0];
-      input.value = store.getItem(name);
-      input.oninput = () => store.setItem(name, input.value);
+      if (input) {
+        input.value = store.getItem(name) || '';
+        input.oninput = () => store.setItem(name, input.value);
+      }
     }
-    for (const name of ['include_author', 'include_description']) {
+    for (const name of ['include_author', 'include_description', 'enable_azdo', 'enable_github']) {
       const input = document.getElementsByName(name)[0];
       input.checked = store.getItem(name) === 'true';
       input.oninput = () => store.setItem(name, input.checked ? 'true' : '');
     }
+    
     for (const name of ['from', 'to']) {
       const dateInput = document.getElementsByName(name)[0];
       dateInput.valueAsDate = new Date(store.getItem(name));
@@ -161,10 +193,31 @@
       _content.innerHTML = '';
       document.title = `Report - ${from}–${to}`;
       _content.appendChild(el('h1', document.title));
-      await Promise.all([
-        loadPullRequests(_content.appendChild(el('div'))),
-        loadCommits(_content.appendChild(el('div')))
-      ])
+      
+      const promises = [];
+      
+      // Add Azure DevOps functionality if enabled and credentials are provided
+      if (store.enable_azdo === 'true' && store.azdo_organization && store.azdo_username && store.azdo_token) {
+        promises.push(
+          loadPullRequests(_content.appendChild(el('div'))),
+          loadCommits(_content.appendChild(el('div')))
+        );
+      }
+      
+      // Add GitHub functionality if enabled and credentials are provided
+      if (store.enable_github === 'true' && store.github_token) {
+        promises.push(
+          loadGitHubPullRequests(_content.appendChild(el('div'))),
+          loadGitHubCommits(_content.appendChild(el('div')))
+        );
+      }
+      
+      if (promises.length === 0) {
+        _content.appendChild(el('p', 'Please enable and configure at least one platform (Azure DevOps or GitHub) to generate a report.'));
+        return;
+      }
+       
+      await Promise.all(promises);
     }
 
     function formatDate(date) {
@@ -174,10 +227,10 @@
       return formatDate(date) + ' ' + new Date(date).toLocaleTimeString('pl');
     }
 
-    const baseUrl = `https://dev.azure.com/${store.organization}/`;
+    const azdoBaseUrl = `https://dev.azure.com/${store.azdo_organization}/`;
 
-    async function get(path, params) {
-      const url = new URL(path, baseUrl);
+    async function azdoGet(path, params) {
+      const url = new URL(path, azdoBaseUrl);
       url.search = new URLSearchParams(params).toString();
       return fetch(
         url,
@@ -185,7 +238,7 @@
           method: 'get',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + window.btoa(store.username + ':' + store.token)
+            'Authorization': 'Basic ' + window.btoa(store.azdo_username + ':' + store.azdo_token)
           }
         })
         .then(response => {
@@ -195,6 +248,27 @@
             return Promise.reject(new Error(response.statusText))
           }
         });
+    }
+
+    async function githubGet(path, params = {}) {
+      const baseUrl = 'https://api.github.com/';
+      const url = new URL(path, baseUrl);
+      url.search = new URLSearchParams(params).toString();
+      
+      return fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `token ${store.github_token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'work-report-tool'
+        }
+      }).then(response => {
+        if (response.status >= 200 && response.status < 300) {
+          return response.json();
+        } else {
+          return Promise.reject(new Error(`GitHub API error: ${response.statusText}`));
+        }
+      });
     }
 
     function el(tag, ...content) {
@@ -212,14 +286,14 @@
     }
 
     async function getUserId() {
-      const connectionData = await get('_apis/connectionData');
+      const connectionData = await azdoGet('_apis/connectionData');
       return connectionData.authenticatedUser.id;
     }
 
     async function loadCommits(targetElement) {
-      targetElement.appendChild(el('h2', 'Commits'));
+      targetElement.appendChild(el('h2', 'Azure DevOps Commits'));
 
-      const repositories = await get(`_apis/git/repositories`,
+      const repositories = await azdoGet(`_apis/git/repositories`,
         {
           includeLinks: false,
           includeHidden: true
@@ -230,9 +304,9 @@
           .filter(repo => repo.isDisabled === false)
           .map(
             repository =>
-              get(`_apis/git/repositories/${repository.id}/commits`,
+              azdoGet(`_apis/git/repositories/${repository.id}/commits`,
                 {
-                  'author': store.username,
+                  'author': store.azdo_username,
                   'fromDate': new Date(store.from).toISOString(),
                   'toDate': new Date(new Date(store.to).setMinutes(24 * 60 - 1)).toISOString()
                 })
@@ -270,7 +344,7 @@
           for (let count = 0; ; count++) {
             params.$top = pageSize;
             params.$skip = pageSize * count;
-            const result = await get(path, params);
+            const result = await azdoGet(path, params);
             if (result.count == 0)
               break;
             yield result.value.filter(
@@ -282,7 +356,7 @@
         }
       }
 
-      targetElement.appendChild(el('h2', 'Pull requests'));
+      targetElement.appendChild(el('h2', 'Azure DevOps Pull Requests'));
 
       const userId = await getUserId();
 
@@ -310,7 +384,7 @@
             el('h3', repositoryName),
             el('div',
               pullRequests.map(pr => {
-                const url = new URL(`${pr.repository.project.name}/_git/${repositoryName}/pullrequest/${pr.pullRequestId}`, baseUrl);
+                const url = new URL(`${pr.repository.project.name}/_git/${repositoryName}/pullrequest/${pr.pullRequestId}`, azdoBaseUrl);
 
                 const details =
                   el('div',
@@ -343,6 +417,142 @@
         targetElement.append(section)
       }
 
+    }
+
+    // Generic GitHub paginated search function
+    async function* getPagedGitHub(endpoint, searchQueries) {
+      for (const query of searchQueries) {
+        for (let page = 1; ; page++) {
+          const searchParams = {
+            q: store.github_org ? `${query} org:${store.github_org}` : query,
+            sort: 'created',
+            order: 'desc',
+            per_page: 100,
+            page: page
+          };
+
+          const searchResults = await githubGet(endpoint, searchParams);
+          
+          if (searchResults.items.length === 0) {
+            break;
+          }
+          
+          for (const item of searchResults.items) {
+            yield item;
+          }
+        }
+      }
+    }
+
+    async function loadGitHubPullRequests(targetElement) {
+      targetElement.appendChild(el('h2', 'GitHub Pull Requests'));
+
+      try {
+
+        // Search for PRs where user is author or mentioned (actually participated)
+        const dateRange = `${formatDate(store.from)}..${formatDate(store.to)}`;
+        const searchQueries = [
+          `type:pr created:${dateRange} author:@me`,
+          `type:pr updated:${dateRange} commenter:@me`,
+        ];
+
+        const allPRs = new Map(); // Use Map to deduplicate by URL
+        
+        // Process individual PRs as they come from the generator
+        for await (const pr of getPagedGitHub('search/issues', searchQueries)) {
+          allPRs.set(pr.html_url, pr);
+        }
+
+        // Group by repository
+        const groupedPRs = Array.from(allPRs.values())
+          .reduce((groups, pr) => {
+            const repoName = pr.repository_url.split('/').slice(-2).join('/');
+            if (!groups[repoName]) groups[repoName] = [];
+            groups[repoName].push(pr);
+            return groups;
+          }, {});
+
+        // Sort repositories by name
+        const sortedRepos = Object.entries(groupedPRs)
+          .sort((a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase()));
+
+        for (const [repoName, pullRequests] of sortedRepos) {
+          const section = el('section',
+            el('h3', repoName),
+            el('div',
+              pullRequests.map(pr => {
+                const details = el('div',
+                  `Created: ${formatDateTime(pr.created_at)}`,
+                  pr.state === 'closed' && pr.closed_at ? ` | Closed: ${formatDateTime(pr.closed_at)}` : '',
+                  store.include_author ? ` | Author: ${pr.user.login}` : ''
+                );
+
+                const description = store.include_description && pr.body ? 
+                  el('div',
+                    el('div', 'Description:'),
+                    el('pre', pr.body.substring(0, 400) + (pr.body.length > 400 ? ' ...' : ''))
+                  ) : '';
+
+                return el('div',
+                  el('span', `[#${pr.number}] `), 
+                  href(pr.title, pr.html_url),
+                  el('small', details, description)
+                );
+              })
+            )
+          );
+          targetElement.appendChild(section);
+        }
+
+      } catch (error) {
+        targetElement.appendChild(el('div', `Error loading GitHub PRs: ${error.message}`));
+      }
+    }
+
+    async function loadGitHubCommits(targetElement) {
+      targetElement.appendChild(el('h2', 'GitHub Commits'));
+
+      try {
+        const searchQuery = `author:@me author-date:${formatDate(store.from)}..${formatDate(store.to)}`;
+        
+        const allCommits = [];
+        for await (const commit of getPagedGitHub('search/commits', [searchQuery])) {
+          allCommits.push(commit);
+        }
+
+        // Group by repository
+        const groupedCommits = allCommits.reduce((groups, commit) => {
+          const repoName = commit.repository.full_name;
+          if (!groups[repoName]) groups[repoName] = [];
+          groups[repoName].push(commit);
+          return groups;
+        }, {});
+
+        // Sort repositories by name
+        const sortedRepos = Object.entries(groupedCommits)
+          .sort((a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase()));
+
+        for (const [repoName, commits] of sortedRepos) {
+          const section = el('section',
+            el('h3', repoName),
+            el('div',
+              commits.map(commit => 
+                el('div',
+                  el('div', href(commit.commit.message.split('\n')[0], commit.html_url)),
+                  el('small',
+                    `Commit: ${commit.sha.substring(0, 7)} | Date: ${formatDateTime(commit.commit.author.date)}`,
+                    store.include_author ? ` | Author: ${commit.commit.author.email}` : ''
+                  )
+                )
+              )
+            )
+          );
+          targetElement.appendChild(section);
+        }
+
+      } catch (error) {
+        targetElement.appendChild(el('div', `Error loading GitHub commits: ${error.message}`));
+      }
     }
 
   </script>
