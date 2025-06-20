@@ -39,6 +39,24 @@
       display: block;
     }
 
+    .token-help {
+      font-size: 80%;
+      display: none;
+      color: #666;
+    }
+    
+    .help-toggle {
+      display: none;
+    }
+    
+    .help-toggle:checked + .help-indicator + .token-help {
+      display: inline;
+    }
+    
+    .help-indicator {
+      cursor: pointer;
+    }
+
     #error {
       color: red;
       font-weight: bold;
@@ -90,11 +108,14 @@
       </legend>
       <div>
         <label for="azdo_organization">Organization:</label>
-        <input type="text" name="azdo_organization" required>
+        <input type="text" name="azdo_organization" required placeholder="Organization name">
         <label for="azdo_username">Username:</label>
-        <input type="text" name="azdo_username" required>
+        <input type="text" name="azdo_username" required placeholder="Your username">
         <label for="azdo_token">Token:</label>
-        <input type="password" name="azdo_token" required>
+        <input type="password" name="azdo_token" required placeholder="Personal Access Token">
+        <input type="checkbox" id="azdo-help-toggle" class="help-toggle">
+        <label for="azdo-help-toggle" class="help-indicator">ℹ️</label>
+        <span class="token-help">Create Token at: User Settings → Personal access tokens → New Token. Required scopes: <strong>Code (read)</strong>, <strong>Pull Request (read)</strong></span>
       </div>
     </fieldset>
     
@@ -104,10 +125,13 @@
         <label for="enable_github">GitHub</label>
       </legend>
       <div>
-        <label for="github_token">Token:</label>
-        <input type="password" name="github_token">
         <label for="github_org">Organization:</label>
-        <input type="text" name="github_org">
+        <input type="text" name="github_org" placeholder="(optional)">
+        <label for="github_token">Token:</label>
+        <input type="password" name="github_token" placeholder="Personal Access Token">
+        <input type="checkbox" id="github-help-toggle" class="help-toggle">
+        <label for="github-help-toggle" class="help-indicator">ℹ️</label>
+        <div class="token-help">Create Token at: Settings → Developer settings → Personal access tokens → Fine-grained tokens. Required permissions: <strong>Contents (read)</strong>, <strong>Pull requests (read)</strong>, <strong>Metadata (read)</strong></div>
       </div>
     </fieldset>
     
