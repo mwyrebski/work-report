@@ -269,7 +269,7 @@
           if (response.status >= 200 && response.status < 300) {
             return Promise.resolve(response.json())
           } else {
-            return Promise.reject(new Error(response.statusText))
+            return Promise.reject(new Error(`Azure DevOps API error: ${response.status} ${response.statusText}`.trim()))
           }
         });
     }
@@ -290,7 +290,9 @@
         if (response.status >= 200 && response.status < 300) {
           return response.json();
         } else {
-          return Promise.reject(new Error(`GitHub API error: ${response.statusText}`));
+          return response.json().catch(() => ({})).then(body =>
+            Promise.reject(new Error(`GitHub API error: ${response.status} ${body.message || response.statusText}`.trim()))
+          );
         }
       });
     }
@@ -500,6 +502,10 @@
         const sortedRepos = Object.entries(groupedPRs)
           .sort((a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase()));
 
+        if (sortedRepos.length === 0) {
+          targetElement.appendChild(el('p', 'No pull requests found for the selected period.'));
+        }
+
         for (const [repoName, pullRequests] of sortedRepos) {
           const section = el('section',
             el('h3', repoName),
@@ -555,6 +561,10 @@
         // Sort repositories by name
         const sortedRepos = Object.entries(groupedCommits)
           .sort((a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase()));
+
+        if (sortedRepos.length === 0) {
+          targetElement.appendChild(el('p', 'No commits found for the selected period.'));
+        }
 
         for (const [repoName, commits] of sortedRepos) {
           const section = el('section',
